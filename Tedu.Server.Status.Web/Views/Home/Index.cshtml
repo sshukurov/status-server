@@ -1,0 +1,101 @@
+﻿@page
+<script src="~/Scripts/jquery-3.4.1.min.js"></script>
+
+<script>
+    $(document).ready(function() {
+        var options = {};
+        options.url = "/api/Probes/latest";
+        options.type = "GET";
+        options.dataType = "json";
+        options.success = function(data) {
+            if (data == null) {
+                $("#serversCount").text(0);
+                $("#result").empty();
+                return;
+            }
+
+            var result = $("<div></div>");
+            $("#serversCount").text(data.servers.length);
+            result.append("<h3>Last checked: " + new Date(data.checkedDateTimeUtc) + "</h3>");
+            data.servers.forEach(function(server) {
+                result.append("<hr>");
+                result.append("<h4 style='color: blue'>" + server.host + "</h4>");
+                result.append("<ul>");
+                server.probes.forEach(function(probe) {
+                    var itemColor = probe.result === "Success" ? "green" : "red";
+                    var probeResult = probe.result === "Success" ? "Yes" : "No";
+                    result.append("<li style='color: " + itemColor + "'>" + probe.type + ": " + probeResult + "</li>");
+                });
+                var listItem = $("<li></li>");
+                var retrieveSettingsElement = $("<a href='javascript:void(0)'>Retrieve settings</a>")
+                    .click({ serverId: server.id }, retrieveSettings);
+                listItem.append(retrieveSettingsElement);
+                result.append(listItem);
+
+                result.append("</ul>");
+                result.append("<p id='settings_" + server.id + "'></p>");
+
+                var backupInfoElement = $("<a href='javascript:void(0)' class='backup'>Backup Information</a>");
+                backupInfoElement.click(function() {
+                    $("#backup_" + server.id).toggle();
+                });
+                result.append(backupInfoElement);
+                fillBackupSection(server, result);
+            });
+            $("#result").html(result);
+        };
+        options.error = function(e) {
+            console.log(e);
+        };
+        $.ajax(options);
+    });
+
+    function fillBackupSection(server, html) {
+        var backup = server.backup;
+        if (backup) {
+            
+            var container = $("<p id='backup_" + server.id + "'></p>");
+            var backupList = $("<ul></ul>");
+            container.append(backupList);
+            container.hide();
+            for (var propertyName in backup) {
+                if (backup.hasOwnProperty(propertyName)) {
+                    backupList.append("<li>" + propertyName + ": " + backup[propertyName] + "</li>");
+                }
+            }
+            html.append(container);
+        }
+    }
+
+    function retrieveSettings(event) {
+        var serverId = event.data.serverId;
+        var container = $("<div></div>");
+        var hideButton = $("<a href='javascript:void(0)'>Hide</a>").click({ serverId: serverId }, function(e) {
+            $("#settings_" + e.data.serverId).empty();
+        });
+        container.append(hideButton);
+
+        var options = {};
+        options.url = "/api/Servers/" + serverId + "/settings";
+        options.type = "GET";
+        options.dataType = "json";
+        options.success = function(data) {
+            container.append("<ul>");
+            for(var propertyName in data) {
+               container.append("<li>" + propertyName + ": " + data[propertyName] + "</li>");
+            }
+            container.append("</ul>");
+            $("#settings_" + serverId).html(container);
+        };
+        options.error = function(e) {
+            console.log(e);
+            container.append("<p>Error occurred while retrieving settings.</p>");
+            $("#settings_" + serverId).html(container);
+        };
+        $.ajax(options);
+    }
+</script>
+
+<h1>TEDU Status 0.1</h1>
+<h2>Servers count: <span id="serversCount">0</span></h2>
+<div id="result"></div>
